@@ -1,0 +1,30 @@
+# Build artifacts
+build/
+distributed_search
+distributed_search_debug
+
+# Output files
+output/
+results/
+benchmark_results.csv
+
+# Test data (generated)
+testdata/
+
+# Docker
+docker/ssh_keys/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
