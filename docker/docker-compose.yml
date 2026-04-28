@@ -1,0 +1,80 @@
+
+services:
+  master:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: mpi-master
+    hostname: master
+    networks:
+      - external-gateway
+      - internal-backend
+    volumes:
+      - ../testdata:/app/testdata:ro,z
+      - ../output:/app/output:z
+      - ../results:/app/results:z
+    command: |
+      bash -c "
+        /usr/sbin/sshd -D &
+        sleep 2
+        echo 'master slots=2' > /app/hostfile
+        echo 'worker1 slots=2' >> /app/hostfile
+        echo 'worker2 slots=2' >> /app/hostfile
+        echo '--- MPI Hostfile ---'
+        cat /app/hostfile
+        echo '--- Cleaning Old Outputs ---'
+        rm -f /app/output/matches_rank_*.csv
+        echo '--- Running MPI Search ---'
+        mpirun --hostfile /app/hostfile --mca btl_tcp_if_include 10.20.0.0/16 -np 4 /app/distributed_search --file /app/testdata/test_10240mb.txt --token distributed --buffer-size 64 --print-mode sample --sample-size 5 --output-dir /app/output
+        echo '--- Running Verification ---'
+        python3 /app/scripts/verify_search.py --file /app/testdata/test_10240mb.txt --token distributed --mpi-output-dir /app/output --oracle-output /app/results/check_results.csv
+        echo '--- Done ---'
+        tail -f /dev/null
+      "
+    depends_on:
+      - worker1
+      - worker2
+
+  # Worker node 1
+  worker1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: mpi-worker1
+    hostname: worker1
+    networks:
+      - internal-backend
+    volumes:
+      - ../testdata:/app/testdata:ro,z
+      - ../output:/app/output:z
+    command: >
+      bash -c "/usr/sbin/sshd -D"
+
+  # Worker node 2
+  worker2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: mpi-worker2
+    hostname: worker2
+    networks:
+      - internal-backend
+    volumes:
+      - ../testdata:/app/testdata:ro,z
+      - ../output:/app/output:z
+    command: >
+      bash -c "/usr/sbin/sshd -D"
+
+# Network definitions
+networks:
+  external-gateway:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.10.0.0/16
+  internal-backend:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.20.0.0/16
